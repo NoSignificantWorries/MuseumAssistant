@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from collections import deque
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -88,7 +89,7 @@ class InteractiveStandDetector:
         
         return False
 
-    def get_person_depth(self, frame):
+    def get_person_depth(self, frame) -> Optional[tuple[float, np.array]]:
         """
         Анализирует кадр и возвращает оценку дистанции до человека,
         при условии что модель уверенно видит голову и плечи.
@@ -110,19 +111,19 @@ class InteractiveStandDetector:
         keypoints = results[0].keypoints
         
         # Если нет ключевых точек — fallback на bbox без проверки pose
-        if len(keypoints) == 0:
-            box = results[0].boxes.xyxy[0].cpu().numpy()
-            box_height = box[3] - box[1]
-            distance = max(0.5, 300 / box_height)
-            
-            # Анализ скорости даже без позы
-            center = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
-            slowing_down = self._analyze_speed(center)
-            
-            x1, y1, x2, y2 = map(int, box)
-            color = (0, 255, 0) if slowing_down else (0, 255, 255)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            return distance
+        # if len(keypoints) == 0:
+        #     box = results[0].boxes.xyxy[0].cpu().numpy()
+        #     box_height = box[3] - box[1]
+        #     distance = max(0.5, 300 / box_height)
+        #     
+        #     # Анализ скорости даже без позы
+        #     center = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
+        #     slowing_down = self._analyze_speed(center)
+        #     
+        #     x1, y1, x2, y2 = map(int, box)
+        #     color = (0, 255, 0) if slowing_down else (0, 255, 255)
+        #     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        #     return distance, keypoints.xy[0].cpu().numpy()[0]
         
         # Получаем confidence ключевых точек первой детекции
         conf = keypoints.conf[0].cpu().numpy()
@@ -153,7 +154,7 @@ class InteractiveStandDetector:
             color = (0, 255, 0) if slowing_down else (0, 255, 255)
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             
-            return distance
+            return distance, keypoints.xy[0].cpu().numpy()[0]
         else:
             # Если недостаточно данных — красный прямоугольник и None
             box = results[0].boxes.xyxy[0].cpu().numpy()

@@ -12,7 +12,7 @@ GENDER_MODEL = Path("../shared/demographics/gender_net.caffemodel").resolve().ab
 
 AGE_LIST = ['0-2', '4-6', '8-12', '15-20',
             '21-24', '25-32', '33-43', '44-53', '60-100']
-GENDER_LIST = ['Male', 'Female']
+GENDER_LIST = ['Male', 'Female', "Unknown"]
 MODEL_MEAN_VALUES = (78.4263377603, 87.7689143744, 114.895847746)
 
 
@@ -47,7 +47,10 @@ class DemographicsEstimator:
         )
         self.gender_net.setInput(blob)
         g_pred = self.gender_net.forward()
-        gender = GENDER_LIST[g_pred[0].argmax()]
+        gender_id = g_pred[0].argmax()
+        if g_pred[0][gender_id] < 0.65:
+            gender_id = -1
+        gender = GENDER_LIST[gender_id]
 
         self.age_net.setInput(blob)
         a_pred = self.age_net.forward()
