@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import List
 
 from pydantic import BaseModel
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 import uvicorn
 
 from db import Database
@@ -85,6 +85,15 @@ def read_root():
         }
     }
 
+@app.get("/health")
+def health_check():
+    global database
+    try:
+        database.get("SELECT 1")
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
 @app.get("/sections/")
 def get_sections() -> List[dict]:
     global database
@@ -127,15 +136,82 @@ def get_visit(visit_id: int) -> dict:
         return result[0]
     return {"error": "Visit not found"}
 
-
-@app.get("/health")
-def health_check():
+@app.get("/api/visits/all")
+def get_all_visits() -> List[dict]:
     global database
-    try:
-        database.get("SELECT 1")
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        return {"status": "unhealthy", "error": str(e)}
+    all_visits = database.get('''SELECT * FROM visits
+                                 ORDER BY timestamp DESC''')
+    return all_visits
+
+@app.get("/api/stands/{stand_name}/date_range")
+def get_dates_range_by_stand(stand_name: str):
+    global database
+    stand_id = database.get("SELECT id FROM stands WHERE name = ?", (stand_name,))
+    if not stand_id:
+        return []
+    
+    dates = database.get('''SELECT
+                                MIN(DATE(timestamp)) as min_date,
+                                MAX(DATE(timestamp)) as max_date
+                            FROM visits
+                            WHERE stand_id = ?''', (stand_id[0]["id"],))
+    return dates[0]
+
+@app.get("/api/stands/{stand_name}/dates")
+def get_dates_range_by_stand(stand_name: str):
+    global database
+    stand_id = database.get("SELECT id FROM stands WHERE name = ?", (stand_name,))
+    if not stand_id:
+        return []
+
+    dates = database.get("SELECT timestamp FROM visits WHERE stand_id = ? ORDER BY timestamp DESC", (stand_id[0]["id"],))
+    
+    return dates
+
+@app.get("/api/stands/{stand_name}/stats")
+def get_stats_by_stand(stand_name: str,
+                       start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
+                       end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)")):
+    global database
+    stand_id = database.get("SELECT id FROM stands WHERE name = ?", (stand_name,))
+    if not stand_id:
+        return []
+
+    stand_id = stand_id[0]["id"]
+    stats = database.get('''SELECT
+                                AVG(age) as avg_age,
+                                AVG(time_elapsed) as avg_time_elapsed,
+                                COUNT (*) as total_visits,
+                                (
+                                    SELECT age_group 
+                                    FROM visits 
+                                    WHERE stand_id = ? 
+                                    AND DATE(timestamp) BETWEEN ? AND ?
+                                    GROUP BY age_group 
+                                    ORDER BY COUNT(*) DESC 
+                                    LIMIT 1
+                                ) as most_common_age_group,
+                                (
+                                    SELECT gender 
+                                    FROM visits 
+                                    WHERE stand_id = ? 
+                                    AND DATE(timestamp) BETWEEN ? AND ?
+                                    GROUP BY gender 
+                                    ORDER BY COUNT(*) DESC 
+                                    LIMIT 1
+                                ) as most_common_gender
+                            FROM visits
+                            WHERE stand_id = ?
+                                AND DATE(timestamp) BETWEEN ? AND ?''', (stand_id, start_date, end_date,
+                                                                         stand_id, start_date, end_date,
+                                                                         stand_id, start_date, end_date))
+    return stats[0]
+
+@app.get("/api/stands/names")
+def get_stands_names() -> List[dict]:
+    global database
+    all_names = database.get("SELECT name FROM stands ORDER BY id DESC")
+    return all_names
 
 @app.post("/api/stands/push")
 async def push_stand(data: StandData, request: Request):
@@ -149,16 +225,6 @@ async def push_stand(data: StandData, request: Request):
                         WHERE sec.label = ?''', (data.name, data.description, data.section))
     print(data)
 
-# INSERT INTO visits (stand_id, gender, age_group, age, timestamp, time_elapsed)
-# SELECT 
-#   s.id,
-#   'male',
-#   '25-40',
-#   32.5,
-#   CURRENT_TIMESTAMP,
-#   12.3
-# FROM stands s
-# WHERE s.name = 'VR-зона';
 @app.post("/api/visits/push")
 async def push_visit(data: VisitData, request: Request):
     global database
