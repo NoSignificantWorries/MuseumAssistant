@@ -1,6 +1,18 @@
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY,
-  name TEXT,
-  email TEXT
-)
+CREATE TABLE IF NOT EXISTS stands (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name VARCHAR(100) NOT NULL,
+  description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS visits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stand_id INTEGER NOT NULL,
+  gender VARCHAR(10),
+  age_group VARCHAR(20),
+  age FLOAT,
+  timestamp TIMESTAMP,
+  time_elapsed FLOAT,
+
+  FOREIGN KEY (stand_id) REFERENCES stands(id)
+);
 

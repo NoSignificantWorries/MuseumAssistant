@@ -5,3 +5,5 @@
 .qodo/
 __pycache__/
 
+*.db
+
