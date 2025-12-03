@@ -1,0 +1,30 @@
+{
+  "config": {
+    "name": "stand1",
+    "description": "Simple stand to show how it works",
+    "section": "Examples"
+  },
+  "stand": {
+    "actions": [
+      {
+        "priority": 1000,
+        "when": ["age:0-12"],
+        "hello": ["<hello action>"],
+        "do": ["<action>"],
+        "finish": ["<finish action>"]
+      },
+      {
+        "priority": 500,
+        "when": ["age:13-17"],
+        "hello": ["<hello action>"],
+        "do": ["<action>"],
+        "finish": ["<finish action>"]
+      }
+    ]
+  },
+  "default": {
+    "hello": ["<hello action>"],
+    "do": ["<action>"],
+    "finish": ["<finish action>"]
+  }
+}

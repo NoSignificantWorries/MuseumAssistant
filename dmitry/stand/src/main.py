@@ -1,4 +1,7 @@
+import json
 import time
+import requests
+from pathlib import Path
 from datetime import datetime
 from typing import Optional
 import threading
@@ -11,23 +14,45 @@ from distance_detector import InteractiveStandDetector
 from demographics_detector import DemographicsEstimator
 
 
-class Time:
-    def __init__(self) -> None:
-        self.start = 0
-        self.end = 0
+API = "http://localhost:8000"
+STANDS = "/api/stands/push"
+DATA = "/api/visits/push"
 
-    def start(self):
-        self.start = time.time()
 
-    def stop(self):
-        self.end = time.time()
+def send_data(api_url: str, data: dict):
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "DataSender/1.0"
+    }
+    try:
+        response = requests.post(
+            api_url,
+            json=data,
+            headers=headers,
+            timeout=10
+        )
+        return response
+    except Exception as err:
+        print(err)
 
-    def get(self):
-        return self.end - self.start
+    return None
 
 
 class Pipeline:
-    def __init__(self) -> None:
+    def __init__(self, config: str | Path) -> None:
+        if isinstance(config, str):
+            config = Path(config).resolve().expanduser()
+
+        if not config.exists():
+            raise FileNotFoundError("Not found config file")
+
+        with open(config, "r") as config_file:
+            self.config = json.load(config_file)
+
+        self.msg_config = self.config["config"]
+
+        send_data(f"{API}{STANDS}", self.msg_config)
+
         self._stop_event = threading.Event()
         self._thread = None
 
@@ -56,14 +81,17 @@ class Pipeline:
 
             if dist and dist[0] <= self.activation_distance and not self.activated:
                 self.human_info = self._analyze_frame(frame, dist[1])
-                self._activate()
-                print("Welcome!")
+                if self.human_info:
+                    self._activate()
+                    print("Welcome!")
             elif dist and dist[0] > self.activation_distance and self.activated:
                 self._deactivate()
                 time_elapsed = (self._finished_at - self._started_at) / 60
                 stats = self.human_info
+                stats["name"] = self.msg_config["name"]
                 stats["datetime"] = self._time_activated
                 stats["time_elapsed"] = time_elapsed
+                send_data(f"{API}{DATA}", stats)
                 print(stats)
                 print("Good bye!")
 
@@ -107,13 +135,12 @@ class Pipeline:
         age_str, gender = self._demographic_detector._predict_age_gender(face_img)
         bucket = self._demographic_detector._map_age_bucket(age_str)
 
-        return {"gender": gender, "group": bucket, "age": age_str}
+        return {"gender": gender, "group": bucket, "age_group": age_str, "age": sum(map(int, age_str.split("-"))) / 2}
 
     def _activate(self):
         self._started_at = time.time()
         self.activated = True
-        now = datetime.now()
-        self._time_activated = now.strftime("%d.%m.%Y %H:%M:%S")
+        self._time_activated = datetime.now().isoformat()
 
     def _deactivate(self):
         self._finished_at = time.time()
@@ -142,7 +169,8 @@ class Pipeline:
 
 
 def main():
-    pipeline = Pipeline()
+    config_path = Path("../shared/examples/stand1/config.json").absolute().resolve()
+    pipeline = Pipeline(config_path)
 
     try:
         started = pipeline.start()

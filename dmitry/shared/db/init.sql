@@ -1,7 +1,16 @@
+CREATE TABLE IF NOT EXISTS sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label VARCHAR(100) UNIQUE,
+  description TEXT
+);
+
 CREATE TABLE IF NOT EXISTS stands (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  description TEXT
+  section_id INTEGER NOT NULL,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT,
+
+  FOREIGN KEY (section_id) REFERENCES sections(id)
 );
 
 CREATE TABLE IF NOT EXISTS visits (
@@ -15,4 +24,3 @@ CREATE TABLE IF NOT EXISTS visits (
 
   FOREIGN KEY (stand_id) REFERENCES stands(id)
 );
-
