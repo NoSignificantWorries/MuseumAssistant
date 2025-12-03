@@ -20,6 +20,17 @@ DATA = "/api/visits/push"
 
 
 def send_data(api_url: str, data: dict):
+    """
+    Send JSON payload to the given API URL.
+
+    Args:
+        api_url (str): Full endpoint URL.
+        data (dict): Arbitrary JSON‑serializable payload.
+
+    Returns:
+        requests.Response | None: Response object on success, None on error.
+    """
+
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "DataSender/1.0"
@@ -39,6 +50,14 @@ def send_data(api_url: str, data: dict):
 
 
 class Pipeline:
+    """
+    Orchestrates the full stand pipeline: camera → distance detector →
+    demographics → API calls.
+
+    Loads stand config, initializes detectors and runs the main loop in a
+    background thread.
+    """
+
     def __init__(self, config: str | Path) -> None:
         if isinstance(config, str):
             config = Path(config).resolve().expanduser()
@@ -71,6 +90,13 @@ class Pipeline:
         self._time_activated = None
     
     def _loop(self):
+        """
+        Main processing loop.
+
+        Reads frames from the camera, checks person distance, triggers
+        activation/deactivation, collects stats and sends them to the API.
+        """
+
         while True:
             ret, frame = self._cap.read()
             
@@ -106,6 +132,18 @@ class Pipeline:
         cv2.destroyAllWindows()
             
     def _analyze_frame(self, frame: np.array, nose_pos: np.array) -> Optional[dict]:
+        """
+        Select the face closest to the detected nose and estimate demographics.
+
+        Args:
+            frame (np.ndarray): BGR frame from the camera.
+            nose_pos (np.ndarray): Nose keypoint coordinates (x, y).
+
+        Returns:
+            dict | None: Demographics info for the best face
+                (gender, group, age_group, age) or None if no face is suitable.
+        """
+
         bboxes = self._demographic_detector._detect_faces(frame)
 
         nx, ny = nose_pos
@@ -138,18 +176,40 @@ class Pipeline:
         return {"gender": gender, "group": bucket, "age_group": age_str, "age": sum(map(int, age_str.split("-"))) / 2}
 
     def _activate(self):
+        """
+        Mark the stand as activated and store activation timestamp.
+        """
+
         self._started_at = time.time()
         self.activated = True
         self._time_activated = datetime.now().isoformat()
 
     def _deactivate(self):
+        """
+        Mark the stand as deactivated and store finish timestamp.
+        """
+
         self._finished_at = time.time()
         self.activated = False
 
     def _is_running(self):
+        """
+        Check whether the main loop thread is currently running.
+
+        Returns:
+            bool: True if the pipeline thread is alive, False otherwise.
+        """
+
         return self._thread is not None and self._thread.is_alive()
 
     def start(self) -> bool:
+        """
+        Start the pipeline in a background thread.
+
+        Returns:
+            bool: True if the thread was started, False if it was already running.
+        """
+         
         if not self._is_running():
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._loop)
@@ -159,6 +219,13 @@ class Pipeline:
         return False
 
     def stop(self) -> bool:
+        """
+        Stop the pipeline and wait for the loop thread to finish.
+
+        Returns:
+            bool: Always True after stop is requested.
+        """
+        
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
