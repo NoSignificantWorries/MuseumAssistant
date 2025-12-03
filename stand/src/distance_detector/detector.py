@@ -10,20 +10,15 @@ from ultralytics import YOLO
 
 class InteractiveStandDetector:
     """
-    Detector for a single person in front of the stand and rough distance estimation.
-
-    Uses a YOLOv8 Pose model to detect human keypoints on video frames.
-    The distance is estimated from the bounding box height when the model
-    confidently sees the head (nose) and at least one shoulder.
+    YOLOv8‑based detector for a person in front of the stand and distance estimation.
 
     Attributes:
-        model_path (Path): Local path to the YOLOv8 pose model file.
-        model (YOLO): Loaded YOLOv8 model used for pose detection.
-        activation_distance (float): Distance threshold (in meters) used by the stand logic.
-        speed_history (deque[float]): History of horizontal center displacements
-            for step‑slowdown analysis.
-        last_center (tuple[int, int] | None): Last known center of the person bbox.
-        slowing_down (bool): Flag indicating that the person is slowing down.
+        model_path (Path): Path to the YOLOv8 pose model file.
+        model (YOLO): Loaded YOLOv8 pose model.
+        activation_distance (float): Distance threshold in meters.
+        speed_history (deque[float]): Recent center shifts for slowdown check.
+        last_center (tuple[int, int] | None): Last bbox center.
+        slowing_down (bool): Whether the person is slowing down.
     """
 
     def __init__(self):
@@ -57,19 +52,15 @@ class InteractiveStandDetector:
 
     def _analyze_speed(self, center):
         """
-        Estimate whether the person in front of the stand is slowing down.
-
-        Tracks the horizontal movement of the bounding box center over time and
-        computes the average speed in pixels per frame. If the average speed
-        over the last N frames drops below a threshold, the detector considers
-        that the person is slowing down.
+        Check if the person is slowing down based on bbox center movement.
 
         Args:
-            center (tuple[int, int]): Current bounding box center (x, y).
+            center (tuple[int, int]): Current bbox center (x, y).
 
         Returns:
-            bool: True if the person is likely slowing down, False otherwise.
+            bool: True if slowdown is detected, False otherwise.
         """
+
         if self.last_center is None:
             self.last_center = center
             return False
@@ -93,22 +84,16 @@ class InteractiveStandDetector:
 
     def get_person_depth(self, frame) -> Optional[tuple[float, np.array]]:
         """
-        Analyze a video frame and estimate the distance to a person, if detected.
-
-        The method runs YOLOv8 Pose on the frame, checks confidence for the head
-        (nose) and at least one shoulder, estimates distance from the bounding
-        box height, draws the bbox on the frame and optionally marks slowdown
-        state. If there is no reliable pose, it returns None.
+        Estimate distance to a person on the frame using YOLOv8 pose.
 
         Args:
-            frame (np.ndarray): Input video frame in BGR format (OpenCV).
+            frame (np.ndarray): BGR frame from OpenCV.
 
         Returns:
             Optional[tuple[float, np.ndarray]]:
-                - (distance_in_meters, nose_keypoint_xy) if a confident person
-                  with head and shoulder keypoints is detected;
-                - None if no person is found or keypoints are not reliable.
+                (distance_m, nose_xy) if pose is confident, otherwise None.
         """
+        
         results = self.model(frame, verbose=False)
         
         # If no people are detected – return None
