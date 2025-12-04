@@ -16,12 +16,16 @@ database = None
 
 
 class StandData(BaseModel):
+    """Stand metadata for creation and management."""
+
     name: str
     description: str
     section: str
 
 
 class VisitData(BaseModel):
+    """Visitor data for analytics and storage."""
+
     gender: str
     group: str
     age_group: str
@@ -33,6 +37,8 @@ class VisitData(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Initialize and tear down shared application resources."""
+
     global database
     
     print(f"Initializing database from: {INIT_FILE}")
@@ -77,6 +83,8 @@ app = FastAPI(
 
 @app.get("/")
 def read_root():
+    """Return API info and main endpoints."""
+
     return {
         "message": "Museum Assistant API",
         "endpoints": {
@@ -87,6 +95,8 @@ def read_root():
 
 @app.get("/health")
 def health_check():
+    """Check API and database health status."""
+
     global database
     try:
         database.get("SELECT 1")
@@ -96,17 +106,23 @@ def health_check():
 
 @app.get("/sections/")
 def get_sections() -> List[dict]:
+    """Return all sections ordered by id."""
+
     global database
     sections = database.get("SELECT * FROM sections ORDER BY id")
     return sections
 
 @app.get("/sections/clear")
 def clear_sections() -> None:
+    """Remove all sections from the database."""
+
     global database
     database.truncate_table("sections")
 
 @app.get("/stands/")
 def get_stands() -> List[dict]:
+    """Return all stands ordered by id."""
+
     global database
     stands = database.get("SELECT * FROM stands ORDER BY id")
     return stands
@@ -114,6 +130,8 @@ def get_stands() -> List[dict]:
 
 @app.get("/stands/{stand_id}")
 def get_stand(stand_id: int) -> dict:
+    """Return stand details by numeric id."""
+
     global database
     result = database.get("SELECT * FROM stands WHERE id = ?", (stand_id,))
     if result:
@@ -123,6 +141,8 @@ def get_stand(stand_id: int) -> dict:
 
 @app.get("/visits/")
 def get_visits() -> List[dict]:
+    """Return all visits ordered by timestamp."""
+
     global database
     visits = database.get("SELECT * FROM visits ORDER BY timestamp DESC")
     return visits
@@ -130,6 +150,8 @@ def get_visits() -> List[dict]:
 
 @app.get("/visits/{visit_id}")
 def get_visit(visit_id: int) -> dict:
+    """Return visit details by numeric id."""
+
     global database
     result = database.get("SELECT * FROM visits WHERE id = ?", (visit_id,))
     if result:
@@ -138,6 +160,8 @@ def get_visit(visit_id: int) -> dict:
 
 @app.get("/api/visits/all")
 def get_all_visits() -> List[dict]:
+    """Return all visits without filters."""
+
     global database
     all_visits = database.get('''SELECT * FROM visits
                                  ORDER BY timestamp DESC''')
@@ -145,6 +169,8 @@ def get_all_visits() -> List[dict]:
 
 @app.get("/api/stands/{stand_name}/date_range")
 def get_dates_range_by_stand(stand_name: str):
+    """Return all visit timestamps for a stand."""
+
     global database
     stand_id = database.get("SELECT id FROM stands WHERE name = ?", (stand_name,))
     if not stand_id:
@@ -159,6 +185,8 @@ def get_dates_range_by_stand(stand_name: str):
 
 @app.get("/api/stands/{stand_name}/dates")
 def get_dates_range_by_stand(stand_name: str):
+    """Return all visit timestamps for a stand ordered by time descending."""
+    
     global database
     stand_id = database.get("SELECT id FROM stands WHERE name = ?", (stand_name,))
     if not stand_id:
@@ -170,8 +198,10 @@ def get_dates_range_by_stand(stand_name: str):
 
 @app.get("/api/stands/{stand_name}/stats")
 def get_stats_by_stand(stand_name: str,
-                       start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
-                       end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)")):
+                       start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+                       end_date: str = Query(..., description="End date (YYYY-MM-DD)")):
+    """Return aggregated visit stats for a stand and date range."""
+
     global database
     stand_id = database.get("SELECT id FROM stands WHERE name = ?", (stand_name,))
     if not stand_id:
@@ -209,12 +239,16 @@ def get_stats_by_stand(stand_name: str,
 
 @app.get("/api/stands/names")
 def get_stands_names() -> List[dict]:
+    """Return all stand names."""
+
     global database
     all_names = database.get("SELECT name FROM stands ORDER BY id DESC")
     return all_names
 
 @app.post("/api/stands/push")
 async def push_stand(data: StandData, request: Request):
+    """Create a new stand linked to a section."""
+
     global database
     database.execute('''INSERT INTO stands (section_id, name, description)
                         SELECT
@@ -227,6 +261,8 @@ async def push_stand(data: StandData, request: Request):
 
 @app.post("/api/visits/push")
 async def push_visit(data: VisitData, request: Request):
+    """Store a new visit for a stand."""
+
     global database
     database.execute('''INSERT INTO visits (stand_id, gender, age_group, age, timestamp, time_elapsed)
                         SELECT
