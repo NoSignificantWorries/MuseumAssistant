@@ -13,6 +13,8 @@ STAND_STATS = (lambda stand_id: f"/api/stands/{stand_id}/stats")
 
 
 class Shared:
+    """Shared application state for Streamlit dashboard."""
+
     stands: list = []
     dates_from_stand: pd.Series = pd.Series()
     date_range: tuple = ()
@@ -21,6 +23,8 @@ class Shared:
 
 @st.cache_data(ttl=60)
 def get_data(api_val):
+    """Fetch JSON data from API endpoint with caching and error handling."""
+
     try:
         response = requests.get(f"{API}{api_val}")
         response.raise_for_status()
@@ -31,6 +35,8 @@ def get_data(api_val):
 
 
 def get_stand_stats(stand_name, start_date, end_date):
+    """Get visit statistics for a stand within date range."""
+
     try:
         response = requests.get(
             API + STAND_STATS(stand_name),
@@ -48,6 +54,8 @@ def get_stand_stats(stand_name, start_date, end_date):
 
 
 def stand_callback():
+    """Handle stand selection change and load dates/stats."""
+
     if "stand_select" not in st.session_state:
         return
         
@@ -71,6 +79,8 @@ def stand_callback():
 
 
 def date_callback():
+    """Handle date range change and update statistics."""
+    
     if "stand_select" not in st.session_state or "date_slider" not in st.session_state:
         return
         
