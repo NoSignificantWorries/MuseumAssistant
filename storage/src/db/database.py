@@ -5,12 +5,18 @@ from typing import Iterator, List, Dict, Any
 
 
 class Database:
+    """SQLite database helper with initialization and query execution."""
+
     def __init__(self, init_path: str | Path, db_path: str | Path):
+        """Initialize database with schema from init_path and open db at db_path."""
+
         self.db_path = db_path
         self.init_path = init_path
         self._init_base()
 
     def _init_base(self):
+        """Run SQL initialization script on the database."""
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -22,6 +28,8 @@ class Database:
 
     @contextmanager
     def get_connection(self) -> Iterator[sqlite3.Connection]:
+        """Context manager for SQLite database connection."""
+
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         try:
@@ -30,6 +38,8 @@ class Database:
             conn.close()
     
     def get(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
+        """Execute a SELECT query and return a list of rows as dictionaries."""
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, params)
@@ -37,12 +47,21 @@ class Database:
             return [dict(row) for row in rows]
     
     def execute(self, query: str, params: tuple = ()) -> None:
+        """Execute a query that modifies the database (INSERT, UPDATE, DELETE)."""
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, params)
             conn.commit()
 
     def truncate_table(self, table_name: str, cascade: bool = False) -> int:
+        """
+        Delete all rows in a table with optional foreign key cascade control.
+
+        Returns the number of deleted rows before truncation.
+        Raises Exception on failure.
+        """
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -72,5 +91,5 @@ class Database:
                 
             except sqlite3.Error as e:
                 conn.rollback()
-                raise Exception(f"Ошибка при очистке таблицы {table_name}: {e}")
+                raise Exception(f"ОError truncating table {table_name}: {e}")
 
