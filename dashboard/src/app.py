@@ -1,7 +1,15 @@
 import requests
+import logging
 
 import streamlit as st
 import pandas as pd
+
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 
 API = "http://0.0.0.0:8000"
@@ -189,5 +197,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as err:
+        logging.error(err)
 

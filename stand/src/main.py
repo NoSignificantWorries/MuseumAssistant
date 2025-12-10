@@ -1,5 +1,6 @@
 import json
 import time
+import logging
 import requests
 from pathlib import Path
 from datetime import datetime
@@ -12,6 +13,13 @@ import numpy as np
 # custom modules
 from distance_detector import InteractiveStandDetector
 from demographics_detector import DemographicsEstimator
+
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 
 API = "http://localhost:8000"
@@ -44,7 +52,7 @@ def send_data(api_url: str, data: dict):
         )
         return response
     except Exception as err:
-        print(err)
+        logging.error(err)
 
     return None
 
@@ -79,6 +87,7 @@ class Pipeline:
         self._demographic_detector = DemographicsEstimator()
 
         self.activation_distance = 1.5
+        self.deactivation_time = 2.0
         self.activated = False
 
         self._cap = cv2.VideoCapture(0)
@@ -88,6 +97,7 @@ class Pipeline:
         self._started_at = 0
         self._finished_at = 0
         self._time_activated = None
+        self._time_started = 0
     
     def _loop(self):
         """
@@ -106,11 +116,13 @@ class Pipeline:
             dist = self._movement_distance_detector.get_person_depth(frame)
 
             if dist and dist[0] <= self.activation_distance and not self.activated:
+                self._time_started = time.time()
                 self.human_info = self._analyze_frame(frame, dist[1])
                 if self.human_info:
                     self._activate()
                     print("Welcome!")
-            elif dist and dist[0] > self.activation_distance and self.activated:
+            elif dist and dist[0] > self.activation_distance and self.activated and (time.time() - self._time_started) > self.deactivation_time:
+                self._time_started = 0
                 self._deactivate()
                 time_elapsed = (self._finished_at - self._started_at) / 60
                 stats = self.human_info
@@ -245,12 +257,15 @@ def main():
             time.sleep(0.1)
     except KeyboardInterrupt:
         pipeline.stop()
-    except BaseException:
+        logging.warning("Keyboard interruption")
+    except Exception as err:
         pipeline.stop()
+        logging.error(err)
 
 
 if __name__ == "__main__":
-    main()
-    # except Exception as err:
-    #     print(err)
+    try:
+        main()
+    except Exception as err:
+        logging.error(err)
 

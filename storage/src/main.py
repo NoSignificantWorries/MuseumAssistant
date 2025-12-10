@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import List
@@ -8,6 +9,14 @@ from fastapi import FastAPI, Request, Query
 import uvicorn
 
 from db import Database
+
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 
 DB_PATH = Path("../shared/db/data.db").resolve().absolute()
 INIT_FILE = Path("../shared/db/init.sql").resolve().absolute()
@@ -278,9 +287,12 @@ async def push_visit(data: VisitData, request: Request):
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-    )
+    try:
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+        )
+    except Exception as err:
+        logging.error(err)
 
