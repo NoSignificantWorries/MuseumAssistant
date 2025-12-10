@@ -107,38 +107,43 @@ class Pipeline:
         activation/deactivation, collects stats and sends them to the API.
         """
 
-        while True:
-            ret, frame = self._cap.read()
-            
-            if not ret:
-                raise RuntimeError("Error while reading video capture")
+        try:
+            while True:
+                ret, frame = self._cap.read()
+                
+                if not ret:
+                    raise RuntimeError("Error while reading video capture")
 
-            dist = self._movement_distance_detector.get_person_depth(frame)
+                dist = self._movement_distance_detector.get_person_depth(frame)
 
-            if dist and dist[0] <= self.activation_distance and not self.activated:
-                self._time_started = time.time()
-                self.human_info = self._analyze_frame(frame, dist[1])
-                if self.human_info:
-                    self._activate()
-                    print("Welcome!")
-            elif dist and dist[0] > self.activation_distance and self.activated and (time.time() - self._time_started) > self.deactivation_time:
-                self._time_started = 0
-                self._deactivate()
-                time_elapsed = (self._finished_at - self._started_at) / 60
-                stats = self.human_info
-                stats["name"] = self.msg_config["name"]
-                stats["datetime"] = self._time_activated
-                stats["time_elapsed"] = time_elapsed
-                send_data(f"{API}{DATA}", stats)
-                print(stats)
-                print("Good bye!")
+                if dist and dist[0] <= self.activation_distance and not self.activated:
+                    self._time_started = time.time()
+                    self.human_info = self._analyze_frame(frame, dist[1])
+                    if self.human_info:
+                        self._activate()
+                        print("Welcome!")
+                    requests.get('http://localhost:5000/control-audio?action=play')
+                elif dist and dist[0] > self.activation_distance and self.activated and (time.time() - self._time_started) > self.deactivation_time:
+                    self._time_started = 0
+                    self._deactivate()
+                    time_elapsed = (self._finished_at - self._started_at) / 60
+                    stats = self.human_info
+                    stats["name"] = self.msg_config["name"]
+                    stats["datetime"] = self._time_activated
+                    stats["time_elapsed"] = time_elapsed
+                    send_data(f"{API}{DATA}", stats)
+                    print(stats)
+                    print("Good bye!")
+                    requests.get('http://localhost:5000/control-audio?action=stop')
 
-            if self._stop_event.wait(timeout=0.01):
-                break
+                if self._stop_event.wait(timeout=0.01):
+                    break
 
-            # cv2.imshow('Distance Detector', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+                # cv2.imshow('Distance Detector', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+        except Exception as err:
+            logging.error(err)
 
         self._cap.release()
         cv2.destroyAllWindows()
